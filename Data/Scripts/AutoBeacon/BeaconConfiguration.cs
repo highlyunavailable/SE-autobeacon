@@ -11,15 +11,14 @@ namespace AutoBeacon
     {
         private const string ConfigFileName = "AutoRangeBeaconConfig.xml";
 
-        private const double DefaultMaxBlockMass = 5000000;
-        private const double DefaultMaxWeaponPCU = 200000;
         private const float DefaultMinBeaconRadius = 500;
         private const float DefaultMaxBeaconRadius = 10000;
+        private const double DefaultMaxWeaponPCU = 200000;
+        private const double DefaultMaxBlockMass = 5000000;
+        private static readonly Vector3I DefaultMaxGridDimensions = new Vector3I(45, 25, 15);
         private const float DefaultSmallGridRangeFactor = 0.2f;
         private const double DefaultForceRescanPeriodSecs = 15;
-        private const bool DefaultOverrideHUDText = true;
         private const float DefaultCooldownSecs = 60f;
-        private static readonly Vector3I DefaultBigGrid = new Vector3I(45, 25, 15);
         private static readonly string DefaultOverrideFallbackName = "Notice Me Senpai! >_<;";
 
         // Tiers/modifiers:
@@ -32,7 +31,7 @@ namespace AutoBeacon
         // 0.4: Heavy Weather with lightning
         // 0.5: Severe Weather or extremely high levels of electromagnetic interference 
 
-        private static Dictionary<string, float> DefaultAffectingWeatherTypes = new Dictionary<string, float>
+        private static readonly Dictionary<string, float> DefaultAffectingWeatherTypes = new Dictionary<string, float>
         {
             { "AlienFogHeavy", 0.3f },
             { "AlienFogLight", 0.2f },
@@ -60,57 +59,52 @@ namespace AutoBeacon
         };
 
         /// <summary>
-        /// Smallest beacon range possible after modifications
+        ///     Smallest beacon range possible after modifications
         /// </summary>
         public float MinBeaconRadius { get; set; }
 
         /// <summary>
-        /// Largest beacon range possible after modifications
+        ///     Largest beacon range possible after modifications
         /// </summary>
         public float MaxBeaconRadius { get; set; }
 
         /// <summary>
-        /// Maximum PCU in weapons for range calculations (can be less than server maximum to make this max out early)
+        ///     Maximum PCU in weapons for range calculations (can be less than server maximum to make this max out early)
         /// </summary>
         public double MaxWeaponPCU { get; set; }
 
         /// <summary>
-        /// Maximum grid mass for range calculations
+        ///     Maximum grid mass for range calculations
         /// </summary>
         public double MaxRangeBlockMass { get; set; }
 
         /// <summary>
-        /// The maximum grid size for range calculations.
+        ///     The maximum grid size for range calculations.
         /// </summary>
         public Vector3I MaxGridDimensions { get; set; }
 
         /// <summary>
-        /// How much of a reduction small grids get to their beacon range
+        ///     How much of a reduction small grids get to their beacon range
         /// </summary>
         public float SmallGridRangeFactor { get; set; }
 
         /// <summary>
-        /// What weather types affect the beacon range, and the modifiers for those weathers. Unlisted = no effect
+        ///     What weather types affect the beacon range, and the modifiers for those weathers. Unlisted = no effect
         /// </summary>
         public SerializableDictionary<string, float> AffectingWeatherTypes { get; set; }
 
         /// <summary>
-        /// Scan the grid and all connected grids every ForceRescanPeriodSecs seconds
+        ///     Scan the grid and all connected grids every ForceRescanPeriodSecs seconds
         /// </summary>
         public double ForceRescanPeriodSecs { get; set; }
 
         /// <summary>
-        /// Should override HUD text on the beacon or not with the grid name and beacon radius (unmodified)
-        /// </summary>
-        public bool OverrideHUDText { get; set; }
-
-        /// <summary>
-        /// The HUD name set when the grid has a predefined name like "Large Grid 1234"
+        ///     The HUD name set when the grid has a predefined name like "Large Grid 1234"
         /// </summary>
         public string OverrideFallbackName { get; set; }
 
         /// <summary>
-        /// Approximately how long it will take to go from full speed visibility to minimum speed visibility
+        ///     Approximately how long it will take to go from full speed visibility to minimum speed visibility
         /// </summary>
         public float CooldownSecs { get; set; }
 
@@ -212,7 +206,7 @@ namespace AutoBeacon
                     { Dictionary = new Dictionary<string, float>(DefaultAffectingWeatherTypes) };
             }
 
-            if (OverrideHUDText && string.IsNullOrWhiteSpace(OverrideFallbackName))
+            if (string.IsNullOrWhiteSpace(OverrideFallbackName))
             {
                 OverrideFallbackName = DefaultOverrideFallbackName;
             }
@@ -232,11 +226,10 @@ namespace AutoBeacon
             MaxBeaconRadius = DefaultMaxBeaconRadius;
             MinBeaconRadius = DefaultMinBeaconRadius;
             SmallGridRangeFactor = DefaultSmallGridRangeFactor;
-            MaxGridDimensions = DefaultBigGrid;
+            MaxGridDimensions = DefaultMaxGridDimensions;
             ForceRescanPeriodSecs = DefaultForceRescanPeriodSecs;
             AffectingWeatherTypes = new SerializableDictionary<string, float>
                 { Dictionary = new Dictionary<string, float>(DefaultAffectingWeatherTypes) };
-            OverrideHUDText = DefaultOverrideHUDText;
             OverrideFallbackName = DefaultOverrideFallbackName;
             CooldownSecs = DefaultCooldownSecs;
         }

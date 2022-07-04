@@ -6,8 +6,8 @@ namespace AutoBeacon
     internal class BeaconWorkData : WorkData
     {
         public readonly MyCubeGrid CubeGrid;
-        public int QualifiedPCU;
         public float BlockMass;
+        public int QualifiedPCU;
 
         public BeaconWorkData(MyCubeGrid cubeGrid)
         {

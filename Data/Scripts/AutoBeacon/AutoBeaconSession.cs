@@ -8,13 +8,13 @@ namespace AutoBeacon
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class AutoBeaconSessionComponent : MySessionComponentBase
     {
-        public static AutoBeaconSessionComponent Instance { get; private set; }
-        public BeaconConfiguration Config { get; private set; }
-
         private static readonly List<string> DisableTerminalActionIds = new List<string>
         {
             "OnOff", "OnOff_On", "OnOff_Off", "IncreaseRadius", "DecreaseRadius"
         };
+
+        public static AutoBeaconSessionComponent Instance { get; private set; }
+        public BeaconConfiguration Config { get; private set; }
 
         public override void LoadData()
         {
@@ -52,6 +52,11 @@ namespace AutoBeacon
             {
                 var control = controls[index];
 
+                if (control == null)
+                {
+                    continue;
+                }
+
                 switch (control.Id)
                 {
                     case "OnOff":
@@ -74,12 +79,6 @@ namespace AutoBeacon
 
                         break;
                     case "HudText":
-                        if (!Config.OverrideHUDText)
-                        {
-                            continue;
-                        }
-
-                        break;
                     case "Radius":
                         break;
                     default:

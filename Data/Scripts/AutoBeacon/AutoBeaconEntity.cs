@@ -9,9 +9,10 @@ using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
+using VRage.Game.ModAPI.Network;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
-using VRage.Utils;
+using VRage.Sync;
 using VRageMath;
 
 namespace AutoBeacon
@@ -20,31 +21,35 @@ namespace AutoBeacon
     public class AutoBeaconEntityComponent : MyGameLogicComponent
     {
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
-
         private IMyBeacon beacon;
         private MyCubeGrid cubeGrid;
         private bool updateBeacon;
-        private float radius;
         private DateTime nextScan;
         private Task? scanTask;
+        private float radius;
         private float decaySpeedMod;
+
+        // Expected that this is never initialized, the game takes care of it
+        private MySync<float, SyncDirection.FromServer> syncRadius;
+
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beacon.ResourceSink;
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
+            beacon = (IMyBeacon)Entity;
+            cubeGrid = (MyCubeGrid)beacon.CubeGrid;
             if (!MyAPIGateway.Session.IsServer && MyAPIGateway.Multiplayer.MultiplayerActive)
             {
                 NeedsUpdate = MyEntityUpdateEnum.NONE;
+                syncRadius.ValueChanged += ClientRadiusOnValueChanged;
                 return;
             }
 
             NeedsUpdate = MyEntityUpdateEnum.EACH_100TH_FRAME | MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
 
-            beacon = (IMyBeacon)Entity;
             beacon.EnabledChanged += BeaconOnEnabledChanged;
             beacon.OnClosing += BeaconOnClosing;
 
-            cubeGrid = (MyCubeGrid)beacon.CubeGrid;
             cubeGrid.OnGridMerge += CubeGridOnGridMerge;
             cubeGrid.OnGridSplit += CubeGridOnGridSplit;
             cubeGrid.OnStaticChanged += CubeGridOnStaticChanged;
@@ -74,10 +79,7 @@ namespace AutoBeacon
 
             beacon.Radius = config.MinBeaconRadius;
             beacon.Enabled = true;
-            if (config.OverrideHUDText)
-            {
-                beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
-            }
+            beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
         }
 
         public override void UpdateBeforeSimulation100()
@@ -104,11 +106,7 @@ namespace AutoBeacon
                 return;
             }
 
-            if (config.OverrideHUDText)
-            {
-                beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
-            }
-
+            beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
             beacon.Enabled = true;
 
             StartScan();
@@ -203,11 +201,7 @@ namespace AutoBeacon
 
             SetBeaconRadius(config, CalculateRadius(config, cubeGrid, workData.QualifiedPCU, workData.BlockMass));
 
-            if (config.OverrideHUDText)
-            {
-                beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
-            }
-
+            beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
             beacon.Enabled = true;
             scanTask = null;
         }
@@ -230,6 +224,7 @@ namespace AutoBeacon
             }
 
             beacon.Radius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
+            syncRadius.Value = beacon.Radius;
         }
 
         private string CreateBeaconName(IMyCubeGrid grid, BeaconConfiguration config)
@@ -283,7 +278,7 @@ namespace AutoBeacon
                 return 0;
             }
 
-            return MathHelper.Clamp(((int)(velocity.Length() / 10f) * 10f) / 50f, 0, 1f);
+            return MathHelper.Clamp((int)(velocity.Length() / 10f) * 10f / 50f, 0, 1f);
         }
 
         private void BeaconOnEnabledChanged(IMyTerminalBlock terminalBlock)
@@ -334,12 +329,17 @@ namespace AutoBeacon
             cubeGrid.OnStaticChanged -= CubeGridOnStaticChanged;
         }
 
-        public void MarkForUpdate()
+        private void ClientRadiusOnValueChanged(MySync<float, SyncDirection.FromServer> obj)
+        {
+            beacon.Radius = obj.Value;
+        }
+
+        private void MarkForUpdate()
         {
             updateBeacon = true;
         }
 
-        public static bool IsValid(IMyEntity obj)
+        private static bool IsValid(IMyEntity obj)
         {
             return obj != null && !obj.MarkedForClose && !obj.Closed;
         }
