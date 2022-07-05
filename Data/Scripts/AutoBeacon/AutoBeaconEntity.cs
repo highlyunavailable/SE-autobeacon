@@ -53,8 +53,6 @@ namespace AutoBeacon
             cubeGrid.OnGridMerge += CubeGridOnGridMerge;
             cubeGrid.OnGridSplit += CubeGridOnGridSplit;
             cubeGrid.OnStaticChanged += CubeGridOnStaticChanged;
-
-            MarkForUpdate();
         }
 
         public override void UpdateOnceBeforeFrame()
@@ -95,7 +93,7 @@ namespace AutoBeacon
                 return;
             }
 
-            if (decaySpeedMod != 0)
+            if (decaySpeedMod > float.Epsilon)
             {
                 decaySpeedMod = Math.Max(0f, decaySpeedMod - 1 / (config.CooldownSecs * 60 / 100));
             }
@@ -108,6 +106,16 @@ namespace AutoBeacon
 
             beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
             beacon.Enabled = true;
+
+            // If we're already at 0 speed and 0 velocity and not decaying speed, and this was not triggered
+            // by an update, skip the scan entirely. If the grid changes, we don't need to know until moving again.
+            if (!updateBeacon &&
+                decaySpeedMod < float.Epsilon &&
+                Vector3.IsZero(cubeGrid.LinearVelocity) &&
+                Math.Abs(beacon.Radius - config.MinBeaconRadius) < float.Epsilon)
+            {
+                return;
+            }
 
             StartScan();
             updateBeacon = false;
@@ -236,16 +244,19 @@ namespace AutoBeacon
 
         private static float CalculateRadius(BeaconConfiguration config, IMyCubeGrid cubeGrid, int pcu, float blockMass)
         {
-            var percentPCU = MathHelper.Clamp(pcu / config.MaxWeaponPCU, 0f, 1f);
+            var pcuWeight = MathHelper.Clamp(pcu / config.MaxWeaponPCU, 0f, 1f) * config.WeaponPCUWeight;
 
             var dimensions = cubeGrid.Max - cubeGrid.Min;
-            var percentBig = MathHelper.Clamp((double)dimensions.Length() / config.MaxGridDimensions.Length(), 0f, 1f);
+            var dimensionsWeight =
+                MathHelper.Clamp((double)dimensions.Length() / config.MaxGridDimensions.Length(), 0f, 1f) *
+                config.GridDimensionsWeight;
 
-            var percentMass = MathHelper.Clamp(blockMass / config.MaxRangeBlockMass, 0f, 1f);
+            var massWeight = MathHelper.Clamp(blockMass / config.MaxRangeBlockMass, 0f, 1f) * config.BlockMassWeight;
 
-            var percentRange = (percentPCU + percentBig + percentMass) / 3;
+            var totalWeight = config.WeaponPCUWeight + config.GridDimensionsWeight + config.BlockMassWeight;
+            var rangePercent = (pcuWeight + dimensionsWeight + massWeight) / (totalWeight);
 
-            var newRadius = Math.Floor(config.MaxBeaconRadius * percentRange);
+            var newRadius = Math.Floor(config.MaxBeaconRadius * rangePercent);
 
             if (cubeGrid.GridSizeEnum == MyCubeSize.Small)
             {

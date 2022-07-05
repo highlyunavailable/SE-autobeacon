@@ -15,6 +15,9 @@ namespace AutoBeacon
         private const float DefaultMaxBeaconRadius = 10000;
         private const double DefaultMaxWeaponPCU = 200000;
         private const double DefaultMaxBlockMass = 5000000;
+        private const int WeaponPCUWeightDefault = 3;
+        private const int BlockMassWeightDefault = 1;
+        private const int GridDimensionsWeightDefault = 1;
         private static readonly Vector3I DefaultMaxGridDimensions = new Vector3I(45, 25, 15);
         private const float DefaultSmallGridRangeFactor = 0.2f;
         private const double DefaultForceRescanPeriodSecs = 15;
@@ -67,6 +70,22 @@ namespace AutoBeacon
         ///     Largest beacon range possible after modifications
         /// </summary>
         public float MaxBeaconRadius { get; set; }
+
+
+        /// <summary>
+        ///     The weight of the PCU relative to the other conditions in the calculated range.
+        /// </summary>
+        public int WeaponPCUWeight { get; set; }
+
+        /// <summary>
+        ///     The weight of the block mass relative to the other conditions in the calculated range.
+        /// </summary>
+        public int BlockMassWeight { get; set; }
+
+        /// <summary>
+        ///     The weight of the grid dimensions relative to the other conditions in the calculated range.
+        /// </summary>
+        public int GridDimensionsWeight { get; set; }
 
         /// <summary>
         ///     Maximum PCU in weapons for range calculations (can be less than server maximum to make this max out early)
@@ -170,9 +189,29 @@ namespace AutoBeacon
                 MaxRangeBlockMass = DefaultMaxBlockMass;
             }
 
+            if (BlockMassWeight <= 0)
+            {
+                BlockMassWeight = BlockMassWeightDefault;
+            }
+
             if (MaxWeaponPCU <= 0)
             {
                 MaxWeaponPCU = DefaultMaxWeaponPCU;
+            }
+
+            if (WeaponPCUWeight <= 0)
+            {
+                WeaponPCUWeight = WeaponPCUWeightDefault;
+            }
+
+            if (MaxGridDimensions == Vector3I.Zero)
+            {
+                MaxGridDimensions = DefaultMaxGridDimensions;
+            }
+
+            if (GridDimensionsWeight <= 0)
+            {
+                GridDimensionsWeight = GridDimensionsWeightDefault;
             }
 
             if (MaxBeaconRadius <= 0)
