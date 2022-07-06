@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using Sandbox.Definitions;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using VRage.Game.Components;
@@ -8,6 +10,10 @@ namespace AutoBeacon
     [MySessionComponentDescriptor(MyUpdateOrder.BeforeSimulation)]
     public class AutoBeaconSessionComponent : MySessionComponentBase
     {
+        // Must match the value of EntityBuilderSubTypeNames in the
+        // MyEntityComponentDescriptor attribute on AutoBeaconEntityComponent
+        private static readonly string[] BeaconSubtypes = { "SmallBlockBeacon", "LargeBlockBeacon" };
+
         private static readonly List<string> DisableTerminalActionIds = new List<string>
         {
             "OnOff", "OnOff_On", "OnOff_Off", "IncreaseRadius", "DecreaseRadius"
@@ -20,6 +26,16 @@ namespace AutoBeacon
         {
             MyAPIGateway.TerminalControls.CustomActionGetter += HandleBeaconActions;
             MyAPIGateway.TerminalControls.CustomControlGetter += HandleBeaconControls;
+
+            foreach (var definition in MyDefinitionManager.Static.GetDefinitionsOfType<MyBeaconDefinition>())
+            {
+                if (!BeaconSubtypes.Contains(definition.Id.SubtypeName))
+                {
+                    continue;
+                }
+
+                definition.BuildProgressModels = Array.Empty<MyCubeBlockDefinition.BuildProgressModel>();
+            }
 
             if (MyAPIGateway.Session.IsServer || !MyAPIGateway.Multiplayer.MultiplayerActive)
             {
