@@ -139,7 +139,7 @@ namespace AutoBeacon
         public float CooldownSecs { get; set; }
 
         /// <summary>
-        ///     The concealment from weather will peak at this intensity and so the grid can stay fully concealed for longer.
+        ///     The concealment from weather will peak at this intensity, so grids can stay fully concealed for longer.
         /// </summary>
         public float WeatherPeakPoint { get; set; }
 

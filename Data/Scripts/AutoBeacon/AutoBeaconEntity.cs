@@ -386,11 +386,18 @@ namespace AutoBeacon
 
         private void BeaconOnClosing(IMyEntity obj)
         {
-            beacon.EnabledChanged -= BeaconOnEnabledChanged;
-            beacon.OnClosing -= BeaconOnClosing;
-            cubeGrid.OnGridMerge -= CubeGridOnGridMerge;
-            cubeGrid.OnGridSplit -= CubeGridOnGridSplit;
-            cubeGrid.OnStaticChanged -= CubeGridOnStaticChanged;
+            if (IsValid(beacon))
+            {
+                beacon.EnabledChanged -= BeaconOnEnabledChanged;
+                beacon.OnClosing -= BeaconOnClosing;
+            }
+
+            if (IsValid(cubeGrid))
+            {
+                cubeGrid.OnGridMerge -= CubeGridOnGridMerge;
+                cubeGrid.OnGridSplit -= CubeGridOnGridSplit;
+                cubeGrid.OnStaticChanged -= CubeGridOnStaticChanged;
+            }
         }
 
         private void ClientRadiusOnValueChanged(MySync<float, SyncDirection.FromServer> obj)
