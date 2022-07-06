@@ -23,11 +23,12 @@ namespace AutoBeacon
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
         private IMyBeacon beacon;
         private MyCubeGrid cubeGrid;
-        private bool updateBeacon;
-        private DateTime nextScan;
-        private Task? scanTask;
         private float radius;
+        private float weatherModifier;
         private float decaySpeedMod;
+        private int nextScanTick;
+        private bool updateBeacon;
+        private Task? scanTask;
 
         // Expected that this is never initialized, the game takes care of it
         private MySync<float, SyncDirection.FromServer> syncRadius;
@@ -53,6 +54,12 @@ namespace AutoBeacon
             cubeGrid.OnGridMerge += CubeGridOnGridMerge;
             cubeGrid.OnGridSplit += CubeGridOnGridSplit;
             cubeGrid.OnStaticChanged += CubeGridOnStaticChanged;
+        }
+
+        public override void Close()
+        {
+            beacon = null;
+            cubeGrid = null;
         }
 
         public override void UpdateOnceBeforeFrame()
@@ -93,27 +100,44 @@ namespace AutoBeacon
                 return;
             }
 
-            if (decaySpeedMod > float.Epsilon)
+            if (decaySpeedMod > 0f)
             {
                 decaySpeedMod = Math.Max(0f, decaySpeedMod - 1 / (config.CooldownSecs * 60 / 100));
             }
 
-            if (!updateBeacon && MyAPIGateway.Session.GameDateTime <= nextScan)
+            var oldRadius = radius;
+            if (!updateBeacon && MyAPIGateway.Session.GameplayFrameCounter < nextScanTick)
             {
                 SetBeaconRadius(config, radius);
+                if (Math.Abs(oldRadius - radius) < 1f)
+                {
+                    return;
+                }
+
+                var newHudText = CreateBeaconName(beacon.CubeGrid, config);
+                if (beacon.HudText != newHudText)
+                {
+                    beacon.HudText = newHudText;
+                }
+
                 return;
             }
 
-            beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
-            beacon.Enabled = true;
+            if (!beacon.Enabled)
+            {
+                beacon.Enabled = true;
+            }
+
+            weatherModifier = GetWeatherModifier(config, cubeGrid.PositionComp.GetPosition());
 
             // If we're already at 0 speed and 0 velocity and not decaying speed, and this was not triggered
             // by an update, skip the scan entirely. If the grid changes, we don't need to know until moving again.
             if (!updateBeacon &&
-                decaySpeedMod < float.Epsilon &&
-                Vector3.IsZero(cubeGrid.LinearVelocity) &&
-                Math.Abs(beacon.Radius - config.MinBeaconRadius) < float.Epsilon)
+                decaySpeedMod < 1f &&
+                Vector3.IsZero(cubeGrid.LinearVelocity, 1f) &&
+                Math.Abs(beacon.Radius - config.MinBeaconRadius) < 1f)
             {
+                nextScanTick = MyAPIGateway.Session.GameplayFrameCounter + config.ForceRescanPeriodSecs * 60;
                 return;
             }
 
@@ -159,6 +183,13 @@ namespace AutoBeacon
                 blocks.Clear();
                 connectedGrid.GetBlocks(blocks);
                 ScanBlocks(blocks, workData);
+
+                var length = (connectedGrid.Max - connectedGrid.Min).Length() * connectedGrid.GridSize;
+                if (length > workData.MaxDimensions)
+                {
+                    workData.MaxDimensions = length;
+                    workData.MaxCubeSize = connectedGrid.GridSizeEnum;
+                }
             }
         }
 
@@ -205,12 +236,27 @@ namespace AutoBeacon
                 return;
             }
 
-            nextScan = MyAPIGateway.Session.GameDateTime.AddSeconds(config.ForceRescanPeriodSecs);
+            nextScanTick = MyAPIGateway.Session.GameplayFrameCounter + config.ForceRescanPeriodSecs * 60;
 
-            SetBeaconRadius(config, CalculateRadius(config, cubeGrid, workData.QualifiedPCU, workData.BlockMass));
+            var oldRadius = radius;
 
-            beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
-            beacon.Enabled = true;
+            SetBeaconRadius(config, CalculateRadius(config,
+                workData.QualifiedPCU, workData.BlockMass, workData.MaxDimensions, workData.MaxCubeSize));
+
+            if (Math.Abs(oldRadius - radius) > 1f)
+            {
+                var newHudText = CreateBeaconName(beacon.CubeGrid, config);
+                if (beacon.HudText != newHudText)
+                {
+                    beacon.HudText = newHudText;
+                }
+            }
+
+            if (!beacon.Enabled)
+            {
+                beacon.Enabled = true;
+            }
+
             scanTask = null;
         }
 
@@ -228,7 +274,15 @@ namespace AutoBeacon
 
             if (newRadius > 0)
             {
-                newRadius *= GetWeatherModifier(config, cubeGrid.PositionComp.GetPosition());
+                newRadius *= weatherModifier;
+            }
+
+            newRadius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
+
+            // Don't bother updating it if it hasn't changed or is a very small change.
+            if (Math.Abs(beacon.Radius - newRadius) < 25f)
+            {
+                return;
             }
 
             beacon.Radius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
@@ -242,23 +296,24 @@ namespace AutoBeacon
                 : $"{grid.CustomName} ({radius:0000})";
         }
 
-        private static float CalculateRadius(BeaconConfiguration config, IMyCubeGrid cubeGrid, int pcu, float blockMass)
+        private static float CalculateRadius(BeaconConfiguration config, int pcu, float blockMass, float dimensions,
+            MyCubeSize cubeSize)
         {
             var pcuWeight = MathHelper.Clamp(pcu / config.MaxWeaponPCU, 0f, 1f) * config.WeaponPCUWeight;
 
-            var dimensions = cubeGrid.Max - cubeGrid.Min;
             var dimensionsWeight =
-                MathHelper.Clamp((double)dimensions.Length() / config.MaxGridDimensions.Length(), 0f, 1f) *
-                config.GridDimensionsWeight;
+                MathHelper.Clamp(
+                    dimensions / (config.maxGridDimensionsLength * (cubeSize == MyCubeSize.Large ? 2.5 : 0.5)), 0f,
+                    1f) * config.GridDimensionsWeight;
 
             var massWeight = MathHelper.Clamp(blockMass / config.MaxRangeBlockMass, 0f, 1f) * config.BlockMassWeight;
 
             var totalWeight = config.WeaponPCUWeight + config.GridDimensionsWeight + config.BlockMassWeight;
-            var rangePercent = (pcuWeight + dimensionsWeight + massWeight) / (totalWeight);
+            var rangePercent = (pcuWeight + dimensionsWeight + massWeight) / totalWeight;
 
             var newRadius = Math.Floor(config.MaxBeaconRadius * rangePercent);
 
-            if (cubeGrid.GridSizeEnum == MyCubeSize.Small)
+            if (cubeSize == MyCubeSize.Small)
             {
                 newRadius *= config.SmallGridRangeFactor;
             }
@@ -272,11 +327,9 @@ namespace AutoBeacon
             float weatherModifer;
             if (config.AffectingWeatherTypes.Dictionary.TryGetValue(weather, out weatherModifer))
             {
-                var intensity = MathHelper.Clamp(
-                    MyAPIGateway.Session.WeatherEffects.GetWeatherIntensity(position),
-                    0, 1);
-
-                return intensity * (1 - weatherModifer);
+                return MathHelper.Clamp(
+                    MyAPIGateway.Session.WeatherEffects.GetWeatherIntensity(position) / config.WeatherPeakPoint,
+                    0, 1) * (1 - weatherModifer);
             }
 
             return 1f;

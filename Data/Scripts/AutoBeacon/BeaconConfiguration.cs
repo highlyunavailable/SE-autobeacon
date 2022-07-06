@@ -15,13 +15,14 @@ namespace AutoBeacon
         private const float DefaultMaxBeaconRadius = 10000;
         private const double DefaultMaxWeaponPCU = 200000;
         private const double DefaultMaxBlockMass = 5000000;
-        private const int WeaponPCUWeightDefault = 3;
-        private const int BlockMassWeightDefault = 1;
-        private const int GridDimensionsWeightDefault = 1;
-        private static readonly Vector3I DefaultMaxGridDimensions = new Vector3I(45, 25, 15);
+        private const int DefaultWeaponPCUWeight = 3;
+        private const int DefaultBlockMassWeight = 1;
+        private const int DefaultGridDimensionsWeight = 1;
         private const float DefaultSmallGridRangeFactor = 0.2f;
-        private const double DefaultForceRescanPeriodSecs = 15;
+        private const int DefaultForceRescanPeriodSecs = 15;
         private const float DefaultCooldownSecs = 60f;
+        private const float DefaultWeatherPeakPoint = 0.75f;
+        private static readonly Vector3I DefaultMaxGridDimensions = new Vector3I(45, 25, 15);
         private static readonly string DefaultOverrideFallbackName = "Notice Me Senpai! >_<;";
 
         // Tiers/modifiers:
@@ -61,6 +62,9 @@ namespace AutoBeacon
             { "RadiationStorm", 0.5f }
         };
 
+        private Vector3I maxGridDimensions;
+        internal int maxGridDimensionsLength;
+
         /// <summary>
         ///     Smallest beacon range possible after modifications
         /// </summary>
@@ -70,7 +74,6 @@ namespace AutoBeacon
         ///     Largest beacon range possible after modifications
         /// </summary>
         public float MaxBeaconRadius { get; set; }
-
 
         /// <summary>
         ///     The weight of the PCU relative to the other conditions in the calculated range.
@@ -100,7 +103,15 @@ namespace AutoBeacon
         /// <summary>
         ///     The maximum grid size for range calculations.
         /// </summary>
-        public Vector3I MaxGridDimensions { get; set; }
+        public Vector3I MaxGridDimensions
+        {
+            get { return maxGridDimensions; }
+            set
+            {
+                maxGridDimensions = value;
+                maxGridDimensionsLength = value.Length();
+            }
+        }
 
         /// <summary>
         ///     How much of a reduction small grids get to their beacon range
@@ -115,7 +126,7 @@ namespace AutoBeacon
         /// <summary>
         ///     Scan the grid and all connected grids every ForceRescanPeriodSecs seconds
         /// </summary>
-        public double ForceRescanPeriodSecs { get; set; }
+        public int ForceRescanPeriodSecs { get; set; }
 
         /// <summary>
         ///     The HUD name set when the grid has a predefined name like "Large Grid 1234"
@@ -126,6 +137,11 @@ namespace AutoBeacon
         ///     Approximately how long it will take to go from full speed visibility to minimum speed visibility
         /// </summary>
         public float CooldownSecs { get; set; }
+
+        /// <summary>
+        ///     The concealment from weather will peak at this intensity and so the grid can stay fully concealed for longer.
+        /// </summary>
+        public float WeatherPeakPoint { get; set; }
 
         public static BeaconConfiguration LoadSettings()
         {
@@ -191,7 +207,7 @@ namespace AutoBeacon
 
             if (BlockMassWeight <= 0)
             {
-                BlockMassWeight = BlockMassWeightDefault;
+                BlockMassWeight = DefaultBlockMassWeight;
             }
 
             if (MaxWeaponPCU <= 0)
@@ -201,17 +217,17 @@ namespace AutoBeacon
 
             if (WeaponPCUWeight <= 0)
             {
-                WeaponPCUWeight = WeaponPCUWeightDefault;
+                WeaponPCUWeight = DefaultWeaponPCUWeight;
             }
 
-            if (MaxGridDimensions == Vector3I.Zero)
+            if (MaxGridDimensions == Vector3I.Zero || maxGridDimensionsLength == 0)
             {
                 MaxGridDimensions = DefaultMaxGridDimensions;
             }
 
             if (GridDimensionsWeight <= 0)
             {
-                GridDimensionsWeight = GridDimensionsWeightDefault;
+                GridDimensionsWeight = DefaultGridDimensionsWeight;
             }
 
             if (MaxBeaconRadius <= 0)
@@ -245,6 +261,11 @@ namespace AutoBeacon
                     { Dictionary = new Dictionary<string, float>(DefaultAffectingWeatherTypes) };
             }
 
+            if (WeatherPeakPoint <= 0)
+            {
+                WeatherPeakPoint = DefaultWeatherPeakPoint;
+            }
+
             if (string.IsNullOrWhiteSpace(OverrideFallbackName))
             {
                 OverrideFallbackName = DefaultOverrideFallbackName;
@@ -271,6 +292,7 @@ namespace AutoBeacon
                 { Dictionary = new Dictionary<string, float>(DefaultAffectingWeatherTypes) };
             OverrideFallbackName = DefaultOverrideFallbackName;
             CooldownSecs = DefaultCooldownSecs;
+            WeatherPeakPoint = DefaultWeatherPeakPoint;
         }
     }
 }
