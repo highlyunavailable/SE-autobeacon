@@ -402,6 +402,10 @@ namespace AutoBeacon
 
         private void ClientRadiusOnValueChanged(MySync<float, SyncDirection.FromServer> obj)
         {
+            if (!IsValid(beacon))
+            {
+                return;
+            }
             beacon.Radius = obj.Value;
         }
 
