@@ -21,8 +21,8 @@ namespace AutoBeacon
     public class AutoBeaconEntityComponent : MyGameLogicComponent
     {
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
-        private IMyBeacon beacon;
-        private MyCubeGrid cubeGrid;
+        private IMyBeacon beaconBlock;
+        private IMyCubeGrid cubeGrid;
         private float radius;
         private float weatherModifier;
         private float decaySpeedMod;
@@ -33,12 +33,12 @@ namespace AutoBeacon
         // Expected that this is never initialized, the game takes care of it
         private MySync<float, SyncDirection.FromServer> syncRadius;
 
-        private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beacon.ResourceSink;
+        private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
-            beacon = (IMyBeacon)Entity;
-            cubeGrid = (MyCubeGrid)beacon.CubeGrid;
+            beaconBlock = (IMyBeacon)Entity;
+            cubeGrid = beaconBlock.CubeGrid;
             if (!MyAPIGateway.Session.IsServer && MyAPIGateway.Multiplayer.MultiplayerActive)
             {
                 NeedsUpdate = MyEntityUpdateEnum.NONE;
@@ -48,17 +48,12 @@ namespace AutoBeacon
 
             NeedsUpdate = MyEntityUpdateEnum.EACH_100TH_FRAME | MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
 
-            beacon.EnabledChanged += BeaconOnEnabledChanged;
-            beacon.OnClosing += BeaconOnClosing;
-
-            cubeGrid.OnGridMerge += CubeGridOnGridMerge;
-            cubeGrid.OnGridSplit += CubeGridOnGridSplit;
-            cubeGrid.OnStaticChanged += CubeGridOnStaticChanged;
+            AddHandlers(beaconBlock, cubeGrid);
         }
 
         public override void Close()
         {
-            beacon = null;
+            beaconBlock = null;
             cubeGrid = null;
         }
 
@@ -82,9 +77,9 @@ namespace AutoBeacon
                 return;
             }
 
-            beacon.Radius = config.MinBeaconRadius;
-            beacon.Enabled = true;
-            beacon.HudText = CreateBeaconName(beacon.CubeGrid, config);
+            beaconBlock.Radius = config.MinBeaconRadius;
+            beaconBlock.Enabled = true;
+            beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, config);
         }
 
         public override void UpdateBeforeSimulation100()
@@ -114,28 +109,32 @@ namespace AutoBeacon
                     return;
                 }
 
-                var newHudText = CreateBeaconName(beacon.CubeGrid, config);
-                if (beacon.HudText != newHudText)
+                var newHudText = CreateBeaconName(beaconBlock.CubeGrid, config);
+                if (beaconBlock.HudText != newHudText)
                 {
-                    beacon.HudText = newHudText;
+                    beaconBlock.HudText = newHudText;
                 }
 
                 return;
             }
 
-            if (!beacon.Enabled)
+            if (!beaconBlock.Enabled)
             {
-                beacon.Enabled = true;
+                beaconBlock.Enabled = true;
             }
 
             weatherModifier = GetWeatherModifier(config, cubeGrid.PositionComp.GetPosition());
 
+            var linearVelocity = Vector3.Zero;
+            if (cubeGrid.Physics != null)
+            {
+                linearVelocity = cubeGrid.Physics.LinearVelocity;
+            }
+
             // If we're already at 0 speed and 0 velocity and not decaying speed, and this was not triggered
             // by an update, skip the scan entirely. If the grid changes, we don't need to know until moving again.
-            if (!updateBeacon &&
-                decaySpeedMod < 1f &&
-                Vector3.IsZero(cubeGrid.LinearVelocity, 1f) &&
-                Math.Abs(beacon.Radius - config.MinBeaconRadius) < 1f)
+            if (!updateBeacon && decaySpeedMod < 1f && Vector3.IsZero(linearVelocity, 1f) &&
+                Math.Abs(beaconBlock.Radius - config.MinBeaconRadius) < 1f)
             {
                 nextScanTick = MyAPIGateway.Session.GameplayFrameCounter + config.ForceRescanPeriodSecs * 60;
                 return;
@@ -147,12 +146,14 @@ namespace AutoBeacon
 
         private void StartScan()
         {
-            if (!IsValid(cubeGrid))
+            var grid = cubeGrid as MyCubeGrid;
+            // IsValid provides null check
+            if (!IsValid(grid))
             {
                 return;
             }
 
-            if (cubeGrid.Physics == null)
+            if (grid.Physics == null)
             {
                 return;
             }
@@ -162,7 +163,7 @@ namespace AutoBeacon
                 return;
             }
 
-            var workData = new BeaconWorkData(cubeGrid);
+            var workData = new BeaconWorkData(grid);
             scanTask = MyAPIGateway.Parallel.Start(ScanGridAction, ScanGridCallback, workData);
         }
 
@@ -245,16 +246,16 @@ namespace AutoBeacon
 
             if (Math.Abs(oldRadius - radius) > 1f)
             {
-                var newHudText = CreateBeaconName(beacon.CubeGrid, config);
-                if (beacon.HudText != newHudText)
+                var newHudText = CreateBeaconName(beaconBlock.CubeGrid, config);
+                if (beaconBlock.HudText != newHudText)
                 {
-                    beacon.HudText = newHudText;
+                    beaconBlock.HudText = newHudText;
                 }
             }
 
-            if (!beacon.Enabled)
+            if (!beaconBlock.Enabled)
             {
-                beacon.Enabled = true;
+                beaconBlock.Enabled = true;
             }
 
             scanTask = null;
@@ -280,13 +281,13 @@ namespace AutoBeacon
             newRadius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
 
             // Don't bother updating it if it hasn't changed or is a very small change.
-            if (Math.Abs(beacon.Radius - newRadius) < 25f)
+            if (Math.Abs(beaconBlock.Radius - newRadius) < 25f)
             {
                 return;
             }
 
-            beacon.Radius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
-            syncRadius.Value = beacon.Radius;
+            beaconBlock.Radius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
+            syncRadius.Value = beaconBlock.Radius;
         }
 
         private string CreateBeaconName(IMyCubeGrid grid, BeaconConfiguration config)
@@ -364,49 +365,106 @@ namespace AutoBeacon
 
         private void CubeGridOnGridMerge(IMyCubeGrid keep, IMyCubeGrid lost)
         {
-            if (beacon.CubeGrid == lost)
+            if (IsValid(beaconBlock) && cubeGrid == lost)
             {
-                return;
+                RemoveHandlers(lost);
             }
 
-            cubeGrid = (MyCubeGrid)beacon.CubeGrid;
+            cubeGrid = keep;
+            AddHandlers(keep);
             MarkForUpdate();
         }
 
         private void CubeGridOnGridSplit(IMyCubeGrid first, IMyCubeGrid second)
         {
-            cubeGrid = (MyCubeGrid)beacon.CubeGrid;
+            RemoveHandlers(first);
+            RemoveHandlers(second);
+            if (first == beaconBlock.SlimBlock.CubeGrid)
+            {
+                AddHandlers(first);
+                cubeGrid = first;
+            }
+            else
+            {
+                AddHandlers(second);
+                cubeGrid = second;
+            }
+
             MarkForUpdate();
         }
 
-        private void CubeGridOnStaticChanged(IMyCubeGrid grid, bool isStatic)
+        private void CubeGridOnIsStaticChanged(IMyCubeGrid grid, bool isStatic)
         {
             MarkForUpdate();
         }
 
         private void BeaconOnClosing(IMyEntity obj)
         {
-            if (IsValid(beacon))
+            var closingBlock = obj as IMyBeacon;
+            if (closingBlock != null && closingBlock == beaconBlock)
             {
-                beacon.EnabledChanged -= BeaconOnEnabledChanged;
-                beacon.OnClosing -= BeaconOnClosing;
-            }
-
-            if (IsValid(cubeGrid))
-            {
-                cubeGrid.OnGridMerge -= CubeGridOnGridMerge;
-                cubeGrid.OnGridSplit -= CubeGridOnGridSplit;
-                cubeGrid.OnStaticChanged -= CubeGridOnStaticChanged;
+                RemoveHandlers(beaconBlock, cubeGrid);
             }
         }
 
         private void ClientRadiusOnValueChanged(MySync<float, SyncDirection.FromServer> obj)
         {
-            if (!IsValid(beacon))
+            if (!IsValid(beaconBlock))
             {
                 return;
             }
-            beacon.Radius = obj.Value;
+
+            beaconBlock.Radius = obj.Value;
+        }
+
+        private void AddHandlers(IMyBeacon beacon, IMyCubeGrid grid)
+        {
+            AddHandlers(beacon);
+            AddHandlers(grid);
+        }
+
+        private void AddHandlers(IMyBeacon beacon)
+        {
+            if (IsValid(beacon))
+            {
+                beacon.EnabledChanged += BeaconOnEnabledChanged;
+                beacon.OnClosing += BeaconOnClosing;
+            }
+        }
+
+        private void AddHandlers(IMyCubeGrid grid)
+        {
+            if (IsValid(grid))
+            {
+                grid.OnGridMerge += CubeGridOnGridMerge;
+                grid.OnGridSplit += CubeGridOnGridSplit;
+                grid.OnIsStaticChanged += CubeGridOnIsStaticChanged;
+            }
+        }
+
+        private void RemoveHandlers(IMyBeacon beacon, IMyCubeGrid grid)
+        {
+            RemoveHandlers(beacon);
+            RemoveHandlers(grid);
+        }
+
+        private void RemoveHandlers(IMyBeacon beacon)
+        {
+            if (IsValid(beacon))
+            {
+                beacon.EnabledChanged -= BeaconOnEnabledChanged;
+                beacon.OnMarkForClose -= BeaconOnClosing;
+            }
+        }
+
+        private void RemoveHandlers(IMyCubeGrid grid)
+        {
+            if (IsValid(grid))
+            {
+                grid.OnGridMerge -= CubeGridOnGridMerge;
+                grid.OnGridSplit -= CubeGridOnGridSplit;
+                grid.OnIsStaticChanged -= CubeGridOnIsStaticChanged;
+            }
         }
 
         private void MarkForUpdate()
@@ -416,7 +474,7 @@ namespace AutoBeacon
 
         private static bool IsValid(IMyEntity obj)
         {
-            return obj != null && !obj.MarkedForClose && !obj.Closed;
+            return obj != null && !obj.MarkedForClose;
         }
     }
 }
