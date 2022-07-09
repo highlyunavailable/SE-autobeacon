@@ -45,13 +45,7 @@ namespace AutoBeacon
                 return;
             }
 
-            var config = AutoBeaconSessionComponent.Instance?.Config;
-            if (config == null || !Util.IsValid(cubeGrid))
-            {
-                return;
-            }
-
-            syncAutoRangeRadius.Value = config.MinBeaconRadius;
+            syncAutoRangeRadius.Value = AutoBeaconSessionComponent.Instance?.Config?.MinBeaconRadius ?? 1;
         }
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
