@@ -37,6 +37,24 @@ namespace AutoBeacon
 
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
 
+        public override void OnAddedToContainer()
+        {
+            base.OnAddedToContainer();
+
+            if (Util.IsClient)
+            {
+                return;
+            }
+
+            var config = AutoBeaconSessionComponent.Instance?.Config;
+            if (config == null || !Util.IsValid(cubeGrid))
+            {
+                return;
+            }
+
+            syncAutoRangeRadius.Value = config.MinBeaconRadius;
+        }
+
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
             beaconBlock = (IMyBeacon)Entity;
@@ -51,6 +69,10 @@ namespace AutoBeacon
             NeedsUpdate = MyEntityUpdateEnum.EACH_100TH_FRAME | MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
 
             AddHandlers(beaconBlock, cubeGrid);
+
+            beaconBlock.Radius = syncAutoRangeRadius.Value;
+            beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, AutoBeaconSessionComponent.Instance?.Config);
+            beaconBlock.Enabled = true;
         }
 
         public override void Close()
@@ -72,17 +94,6 @@ namespace AutoBeacon
             sink.Update();
 
             StartScan();
-
-            var config = AutoBeaconSessionComponent.Instance?.Config;
-            if (config == null || !Util.IsValid(cubeGrid))
-            {
-                return;
-            }
-
-            beaconBlock.Radius = config.MinBeaconRadius;
-            syncAutoRangeRadius.Value = config.MinBeaconRadius;
-            beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, config);
-            beaconBlock.Enabled = true;
         }
 
         // Used to handle initial replication from server to client.
@@ -324,7 +335,7 @@ namespace AutoBeacon
         private string CreateBeaconName(IMyCubeGrid grid, BeaconConfiguration config)
         {
             return grid.CustomName.Contains(" Grid ")
-                ? $"{config.OverrideFallbackName} ({radius:0000})"
+                ? $"{config?.OverrideFallbackName ?? grid.CustomName} ({radius:0000})"
                 : $"{grid.CustomName} ({radius:0000})";
         }
 
