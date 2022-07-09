@@ -8,11 +8,13 @@ using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI;
 using VRage.Game;
 using VRage.Game.Components;
+using VRage.Game.Entity;
 using VRage.Game.ModAPI;
 using VRage.Game.ModAPI.Network;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
 using VRage.Sync;
+using VRage.Utils;
 using VRageMath;
 
 namespace AutoBeacon
@@ -31,7 +33,7 @@ namespace AutoBeacon
         private Task? scanTask;
 
         // Expected that this is never initialized, the game takes care of it
-        private MySync<float, SyncDirection.FromServer> syncRadius;
+        private MySync<float, SyncDirection.FromServer> syncAutoRangeRadius;
 
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
 
@@ -41,8 +43,8 @@ namespace AutoBeacon
             cubeGrid = beaconBlock.CubeGrid;
             if (!MyAPIGateway.Session.IsServer && MyAPIGateway.Multiplayer.MultiplayerActive)
             {
-                NeedsUpdate = MyEntityUpdateEnum.NONE;
-                syncRadius.ValueChanged += ClientRadiusOnValueChanged;
+                NeedsUpdate = MyEntityUpdateEnum.EACH_10TH_FRAME;
+                syncAutoRangeRadius.ValueChanged += ClientOnRadiusChanged;
                 return;
             }
 
@@ -72,25 +74,54 @@ namespace AutoBeacon
             StartScan();
 
             var config = AutoBeaconSessionComponent.Instance?.Config;
-            if (config == null || !IsValid(cubeGrid))
+            if (config == null || !Util.IsValid(cubeGrid))
             {
                 return;
             }
 
             beaconBlock.Radius = config.MinBeaconRadius;
-            beaconBlock.Enabled = true;
+            syncAutoRangeRadius.Value = config.MinBeaconRadius;
             beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, config);
+            beaconBlock.Enabled = true;
+        }
+
+        // Used to handle initial replication from server to client.
+        public override void UpdateBeforeSimulation10()
+        {
+            if (!Util.IsClient)
+            {
+                return;
+            }
+
+            if (ResourceSink.MaxRequiredInputByType(Electricity) > 0)
+            {
+                ResourceSink.SetMaxRequiredInputByType(Electricity, 0);
+                ResourceSink.SetRequiredInputFuncByType(Electricity, () => 0);
+                ResourceSink.Update();
+            }
+
+            if (syncAutoRangeRadius.Value > 0)
+            {
+                beaconBlock.Radius = syncAutoRangeRadius.Value;
+                beaconBlock.Enabled = true;
+                MyGameLogic.ChangeUpdate(this, MyEntityUpdateEnum.NONE);
+            }
+            else
+            {
+                beaconBlock.Radius = 0;
+                beaconBlock.Enabled = true;
+            }
         }
 
         public override void UpdateBeforeSimulation100()
         {
-            if (!IsValid(cubeGrid))
+            if (!Util.IsValid(cubeGrid))
             {
                 return;
             }
 
             var config = AutoBeaconSessionComponent.Instance?.Config;
-            if (config == null || !IsValid(cubeGrid))
+            if (config == null || !Util.IsValid(cubeGrid))
             {
                 return;
             }
@@ -148,7 +179,7 @@ namespace AutoBeacon
         {
             var grid = cubeGrid as MyCubeGrid;
             // IsValid provides null check
-            if (!IsValid(grid))
+            if (!Util.IsValid(grid))
             {
                 return;
             }
@@ -176,7 +207,7 @@ namespace AutoBeacon
             var connectedGrids = scanGrid.GetConnectedGrids(GridLinkTypeEnum.Mechanical);
             foreach (IMyCubeGrid connectedGrid in connectedGrids)
             {
-                if (!IsValid(connectedGrid))
+                if (!Util.IsValid(connectedGrid))
                 {
                     continue;
                 }
@@ -226,7 +257,7 @@ namespace AutoBeacon
         private void ScanGridCallback(WorkData data)
         {
             var workData = (BeaconWorkData)data;
-            if (cubeGrid != workData.CubeGrid || !IsValid(workData.CubeGrid) || !IsValid(Entity))
+            if (cubeGrid != workData.CubeGrid || !Util.IsValid(workData.CubeGrid) || !Util.IsValid(Entity))
             {
                 return;
             }
@@ -286,8 +317,8 @@ namespace AutoBeacon
                 return;
             }
 
-            beaconBlock.Radius = MathHelper.Clamp(newRadius, config.MinBeaconRadius, config.MaxBeaconRadius);
-            syncRadius.Value = beaconBlock.Radius;
+            beaconBlock.Radius = newRadius;
+            syncAutoRangeRadius.Value = beaconBlock.Radius;
         }
 
         private string CreateBeaconName(IMyCubeGrid grid, BeaconConfiguration config)
@@ -350,7 +381,7 @@ namespace AutoBeacon
         {
             var block = terminalBlock as IMyBeacon;
             // IsValid provides null check
-            if (!IsValid(block))
+            if (!Util.IsValid(block))
             {
                 return;
             }
@@ -365,7 +396,7 @@ namespace AutoBeacon
 
         private void CubeGridOnGridMerge(IMyCubeGrid keep, IMyCubeGrid lost)
         {
-            if (IsValid(beaconBlock) && cubeGrid == lost)
+            if (Util.IsValid(beaconBlock) && cubeGrid == lost)
             {
                 RemoveHandlers(lost);
             }
@@ -407,9 +438,9 @@ namespace AutoBeacon
             }
         }
 
-        private void ClientRadiusOnValueChanged(MySync<float, SyncDirection.FromServer> obj)
+        private void ClientOnRadiusChanged(MySync<float, SyncDirection.FromServer> obj)
         {
-            if (!IsValid(beaconBlock))
+            if (!Util.IsValid(beaconBlock))
             {
                 return;
             }
@@ -425,7 +456,7 @@ namespace AutoBeacon
 
         private void AddHandlers(IMyBeacon beacon)
         {
-            if (IsValid(beacon))
+            if (Util.IsValid(beacon))
             {
                 beacon.EnabledChanged += BeaconOnEnabledChanged;
                 beacon.OnClosing += BeaconOnClosing;
@@ -434,7 +465,7 @@ namespace AutoBeacon
 
         private void AddHandlers(IMyCubeGrid grid)
         {
-            if (IsValid(grid))
+            if (Util.IsValid(grid))
             {
                 grid.OnGridMerge += CubeGridOnGridMerge;
                 grid.OnGridSplit += CubeGridOnGridSplit;
@@ -450,7 +481,7 @@ namespace AutoBeacon
 
         private void RemoveHandlers(IMyBeacon beacon)
         {
-            if (IsValid(beacon))
+            if (Util.IsValid(beacon))
             {
                 beacon.EnabledChanged -= BeaconOnEnabledChanged;
                 beacon.OnMarkForClose -= BeaconOnClosing;
@@ -459,7 +490,7 @@ namespace AutoBeacon
 
         private void RemoveHandlers(IMyCubeGrid grid)
         {
-            if (IsValid(grid))
+            if (Util.IsValid(grid))
             {
                 grid.OnGridMerge -= CubeGridOnGridMerge;
                 grid.OnGridSplit -= CubeGridOnGridSplit;
@@ -470,11 +501,6 @@ namespace AutoBeacon
         private void MarkForUpdate()
         {
             updateBeacon = true;
-        }
-
-        private static bool IsValid(IMyEntity obj)
-        {
-            return obj != null && !obj.MarkedForClose;
         }
     }
 }

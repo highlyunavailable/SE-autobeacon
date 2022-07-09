@@ -24,8 +24,11 @@ namespace AutoBeacon
 
         public override void LoadData()
         {
-            MyAPIGateway.TerminalControls.CustomActionGetter += HandleBeaconActions;
-            MyAPIGateway.TerminalControls.CustomControlGetter += HandleBeaconControls;
+            if (!MyAPIGateway.Multiplayer.MultiplayerActive || !MyAPIGateway.Utilities.IsDedicated)
+            {
+                MyAPIGateway.TerminalControls.CustomActionGetter += HandleBeaconActions;
+                MyAPIGateway.TerminalControls.CustomControlGetter += HandleBeaconControls;
+            }
 
             foreach (var definition in MyDefinitionManager.Static.GetDefinitionsOfType<MyBeaconDefinition>())
             {
@@ -73,35 +76,34 @@ namespace AutoBeacon
                     continue;
                 }
 
-                switch (control.Id)
+                if (control.Id == "OnOff")
                 {
-                    case "OnOff":
-                        if (control is IMyTerminalControlOnOffSwitch)
-                        {
-                            control.Visible = terminalBlock => false;
+                    var func = control.Visible;
+                    Func<IMyTerminalBlock, bool> newFunc = terminalBlock =>
+                        func(terminalBlock) &&
+                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>() == null;
 
-                            // Hide the separator as well
-                            if (index + 1 >= controls.Count)
-                            {
-                                continue;
-                            }
+                    control.Visible = newFunc;
 
-                            var nextControl = controls[index + 1];
-                            if (nextControl is IMyTerminalControlSeparator)
-                            {
-                                nextControl.Visible = terminalBlock => false;
-                            }
-                        }
-
-                        break;
-                    case "HudText":
-                    case "Radius":
-                        break;
-                    default:
+                    // Hide the separator as well
+                    if (index + 1 >= controls.Count)
+                    {
                         continue;
-                }
+                    }
 
-                control.Enabled = terminalBlock => false;
+                    var nextControl = controls[index + 1];
+                    if (nextControl is IMyTerminalControlSeparator)
+                    {
+                        nextControl.Visible = newFunc;
+                    }
+                }
+                else if (control.Id == "HudText" || control.Id == "Radius")
+                {
+                    var func = control.Enabled;
+                    control.Enabled = terminalBlock =>
+                        func(terminalBlock) &&
+                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>() == null;
+                }
             }
         }
 

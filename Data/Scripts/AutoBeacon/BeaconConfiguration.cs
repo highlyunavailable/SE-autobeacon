@@ -235,7 +235,7 @@ namespace AutoBeacon
                 MaxBeaconRadius = DefaultMaxBeaconRadius;
             }
 
-            if (MinBeaconRadius <= 0)
+            if (MinBeaconRadius < 1)
             {
                 MinBeaconRadius = DefaultMinBeaconRadius;
             }
