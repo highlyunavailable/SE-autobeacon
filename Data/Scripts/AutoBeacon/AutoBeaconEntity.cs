@@ -14,7 +14,6 @@ using VRage.Game.ModAPI.Network;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
 using VRage.Sync;
-using VRage.Utils;
 using VRageMath;
 
 namespace AutoBeacon
@@ -25,15 +24,15 @@ namespace AutoBeacon
         private static readonly MyDefinitionId Electricity = MyResourceDistributorComponent.ElectricityId;
         private IMyBeacon beaconBlock;
         private IMyCubeGrid cubeGrid;
-        private float radius;
-        private float weatherModifier;
         private float decaySpeedMod;
         private int nextScanTick;
-        private bool updateBeacon;
+        private float radius;
         private Task? scanTask;
 
         // Expected that this is never initialized, the game takes care of it
         private MySync<float, SyncDirection.FromServer> syncAutoRangeRadius;
+        private bool updateBeacon;
+        private float weatherModifier;
 
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
 
