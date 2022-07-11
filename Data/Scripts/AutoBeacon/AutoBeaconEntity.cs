@@ -439,10 +439,7 @@ namespace AutoBeacon
         private void BeaconOnClosing(IMyEntity obj)
         {
             var closingBlock = obj as IMyBeacon;
-            if (closingBlock != null && closingBlock == beaconBlock)
-            {
-                RemoveHandlers(beaconBlock, cubeGrid);
-            }
+            RemoveHandlers(closingBlock, closingBlock?.CubeGrid);
         }
 
         private void ClientOnRadiusChanged(MySync<float, SyncDirection.FromServer> obj)
@@ -463,21 +460,25 @@ namespace AutoBeacon
 
         private void AddHandlers(IMyBeacon beacon)
         {
-            if (Util.IsValid(beacon))
+            if (!Util.IsValid(beacon))
             {
-                beacon.EnabledChanged += BeaconOnEnabledChanged;
-                beacon.OnClosing += BeaconOnClosing;
+                return;
             }
+
+            beacon.EnabledChanged += BeaconOnEnabledChanged;
+            beacon.OnClosing += BeaconOnClosing;
         }
 
         private void AddHandlers(IMyCubeGrid grid)
         {
-            if (Util.IsValid(grid))
+            if (!Util.IsValid(grid))
             {
-                grid.OnGridMerge += CubeGridOnGridMerge;
-                grid.OnGridSplit += CubeGridOnGridSplit;
-                grid.OnIsStaticChanged += CubeGridOnIsStaticChanged;
+                return;
             }
+
+            grid.OnGridMerge += CubeGridOnGridMerge;
+            grid.OnGridSplit += CubeGridOnGridSplit;
+            grid.OnIsStaticChanged += CubeGridOnIsStaticChanged;
         }
 
         private void RemoveHandlers(IMyBeacon beacon, IMyCubeGrid grid)
@@ -488,21 +489,25 @@ namespace AutoBeacon
 
         private void RemoveHandlers(IMyBeacon beacon)
         {
-            if (Util.IsValid(beacon))
+            if (beacon == null)
             {
-                beacon.EnabledChanged -= BeaconOnEnabledChanged;
-                beacon.OnMarkForClose -= BeaconOnClosing;
+                return;
             }
+
+            beacon.EnabledChanged -= BeaconOnEnabledChanged;
+            beacon.OnMarkForClose -= BeaconOnClosing;
         }
 
         private void RemoveHandlers(IMyCubeGrid grid)
         {
-            if (Util.IsValid(grid))
+            if (grid == null)
             {
-                grid.OnGridMerge -= CubeGridOnGridMerge;
-                grid.OnGridSplit -= CubeGridOnGridSplit;
-                grid.OnIsStaticChanged -= CubeGridOnIsStaticChanged;
+                return;
             }
+
+            grid.OnGridMerge -= CubeGridOnGridMerge;
+            grid.OnGridSplit -= CubeGridOnGridSplit;
+            grid.OnIsStaticChanged -= CubeGridOnIsStaticChanged;
         }
 
         private void MarkForUpdate()
