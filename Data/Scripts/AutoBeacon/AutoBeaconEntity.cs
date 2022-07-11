@@ -410,22 +410,25 @@ namespace AutoBeacon
             MarkForUpdate();
         }
 
-        private void CubeGridOnGridSplit(IMyCubeGrid first, IMyCubeGrid second)
+        private void CubeGridOnGridSplit(IMyCubeGrid fromGrid, IMyCubeGrid toGrid)
         {
-            RemoveHandlers(first);
-            RemoveHandlers(second);
-            if (first == beaconBlock.SlimBlock.CubeGrid)
+            if (!Util.IsValid(beaconBlock) ||
+                !Util.IsValid(beaconBlock?.SlimBlock?.CubeGrid))
             {
-                AddHandlers(first);
-                cubeGrid = first;
-            }
-            else
-            {
-                AddHandlers(second);
-                cubeGrid = second;
+                return;
             }
 
             MarkForUpdate();
+
+            if (beaconBlock?.SlimBlock?.CubeGrid == fromGrid ||
+                !Util.IsValid(toGrid) || toGrid != beaconBlock?.SlimBlock?.CubeGrid)
+            {
+                return;
+            }
+
+            RemoveHandlers(fromGrid);
+            AddHandlers(toGrid);
+            cubeGrid = toGrid;
         }
 
         private void CubeGridOnIsStaticChanged(IMyCubeGrid grid, bool isStatic)
