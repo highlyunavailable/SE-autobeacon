@@ -298,6 +298,11 @@ namespace AutoBeacon
 
         private void SetBeaconRadius(BeaconConfiguration config, float newRadius)
         {
+            if (!newRadius.IsValid() || newRadius < 1)
+            {
+                return;
+            }
+
             radius = newRadius;
 
             if (cubeGrid.Physics != null)

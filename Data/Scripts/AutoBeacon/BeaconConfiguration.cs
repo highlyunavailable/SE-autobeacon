@@ -177,6 +177,7 @@ namespace AutoBeacon
 
             var settings = new BeaconConfiguration();
             settings.SetDefaults();
+            settings.Validate();
             SaveSettings(settings);
             return settings;
         }
@@ -282,11 +283,14 @@ namespace AutoBeacon
         private void SetDefaults()
         {
             MaxRangeBlockMass = DefaultMaxBlockMass;
+            BlockMassWeight = DefaultBlockMassWeight;
             MaxWeaponPCU = DefaultMaxWeaponPCU;
+            WeaponPCUWeight = DefaultWeaponPCUWeight;
             MaxBeaconRadius = DefaultMaxBeaconRadius;
             MinBeaconRadius = DefaultMinBeaconRadius;
             SmallGridRangeFactor = DefaultSmallGridRangeFactor;
             MaxGridDimensions = DefaultMaxGridDimensions;
+            GridDimensionsWeight = DefaultGridDimensionsWeight;
             ForceRescanPeriodSecs = DefaultForceRescanPeriodSecs;
             AffectingWeatherTypes = new SerializableDictionary<string, float>
                 { Dictionary = new Dictionary<string, float>(DefaultAffectingWeatherTypes) };
