@@ -298,7 +298,7 @@ namespace AutoBeacon
 
         private void SetBeaconRadius(BeaconConfiguration config, float newRadius)
         {
-            if (!newRadius.IsValid() || newRadius < 1)
+            if (float.IsNaN(newRadius) || float.IsInfinity(newRadius) || newRadius < 0)
             {
                 return;
             }
