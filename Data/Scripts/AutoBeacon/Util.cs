@@ -1,7 +1,6 @@
 using Sandbox.ModAPI;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
-using VRage.Utils;
 
 namespace AutoBeacon
 {
@@ -10,7 +9,13 @@ namespace AutoBeacon
         public static bool IsClient =>
             MyAPIGateway.Multiplayer.MultiplayerActive && !MyAPIGateway.Multiplayer.IsServer;
 
-        public static bool IsValid(IMyEntity entity) => entity != null && !entity.MarkedForClose;
+        public static bool IsDedicatedServer =>
+            MyAPIGateway.Multiplayer.MultiplayerActive && MyAPIGateway.Utilities.IsDedicated;
+
+        public static bool IsValid(IMyEntity entity)
+        {
+            return entity != null && !entity.MarkedForClose;
+        }
 
         public static bool IsNpcOwned(IMyCubeBlock obj)
         {

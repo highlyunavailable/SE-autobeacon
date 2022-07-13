@@ -4,7 +4,6 @@ using Sandbox.Definitions;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using VRage.Game.Components;
-using VRage.Utils;
 
 namespace AutoBeacon
 {
@@ -25,10 +24,9 @@ namespace AutoBeacon
 
         public override void LoadData()
         {
-            if (!MyAPIGateway.Multiplayer.MultiplayerActive || !MyAPIGateway.Utilities.IsDedicated)
+            if (!Util.IsDedicatedServer)
             {
                 MyAPIGateway.TerminalControls.CustomActionGetter += HandleBeaconActions;
-                MyAPIGateway.TerminalControls.CustomControlGetter += HandleBeaconControls;
             }
 
             foreach (var definition in MyDefinitionManager.Static.GetDefinitionsOfType<MyBeaconDefinition>())
@@ -52,21 +50,18 @@ namespace AutoBeacon
         protected override void UnloadData()
         {
             MyAPIGateway.TerminalControls.CustomActionGetter -= HandleBeaconActions;
-            MyAPIGateway.TerminalControls.CustomControlGetter -= HandleBeaconControls;
             Instance = null;
         }
 
-        private void HandleBeaconControls(IMyTerminalBlock block, List<IMyTerminalControl> controls)
+        public override void BeforeStart()
         {
-            var beaconBlock = block as IMyBeacon;
-            var logic = beaconBlock?.GameLogic.GetAs<AutoBeaconEntityComponent>();
-            if (logic == null || logic.UiBound)
+            if (Util.IsDedicatedServer)
             {
                 return;
             }
 
-            List<IMyTerminalControl> controlList;
-            MyAPIGateway.TerminalControls.GetControls<IMyBeacon>(out controlList);
+            List<IMyTerminalControl> controls;
+            MyAPIGateway.TerminalControls.GetControls<IMyBeacon>(out controls);
 
             for (var index = 0; index < controls.Count; index++)
             {
@@ -79,12 +74,8 @@ namespace AutoBeacon
 
                 if (control.Id == "OnOff")
                 {
-                    var func = control.Visible;
-                    Func<IMyTerminalBlock, bool> newFunc = terminalBlock =>
-                        func(terminalBlock) &&
-                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
-
-                    control.Visible = newFunc;
+                    control.Enabled = DisableIfAutoBeacon(control.Enabled);
+                    control.Visible = DisableIfAutoBeacon(control.Visible);
 
                     // Hide the separator as well
                     if (index + 1 >= controls.Count)
@@ -95,19 +86,32 @@ namespace AutoBeacon
                     var nextControl = controls[index + 1];
                     if (nextControl is IMyTerminalControlSeparator)
                     {
-                        nextControl.Visible = newFunc;
+                        nextControl.Visible = DisableIfAutoBeacon(nextControl.Visible);
                     }
                 }
                 else if (control.Id == "HudText" || control.Id == "Radius")
                 {
-                    var func = control.Enabled;
-                    control.Enabled = terminalBlock =>
-                        func(terminalBlock) &&
-                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
+                    control.Enabled = DisableIfAutoBeacon(control.Enabled);
                 }
             }
 
-            logic.UiBound = true;
+            List<IMyTerminalAction> actions;
+            MyAPIGateway.TerminalControls.GetActions<IMyBeacon>(out actions);
+
+            foreach (var action in actions)
+            {
+                if (DisableTerminalActionIds.Contains(action.Id))
+                {
+                    action.Enabled = DisableIfAutoBeacon(action.Enabled);
+                }
+            }
+        }
+
+        private Func<IMyTerminalBlock, bool> DisableIfAutoBeacon(Func<IMyTerminalBlock, bool> wrapFunc)
+        {
+            return terminalBlock =>
+                wrapFunc(terminalBlock) &&
+                terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
         }
 
         private void HandleBeaconActions(IMyTerminalBlock block, List<IMyTerminalAction> actions)
