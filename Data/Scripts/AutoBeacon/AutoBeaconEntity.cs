@@ -33,8 +33,10 @@ namespace AutoBeacon
         private MySync<float, SyncDirection.FromServer> syncAutoRangeRadius;
         private bool updateBeacon;
         private float weatherModifier;
+        internal bool UiBound;
 
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
+        public bool IgnoredBeacon { get; private set; }
 
         public override void OnAddedToContainer()
         {
@@ -52,6 +54,7 @@ namespace AutoBeacon
         {
             beaconBlock = (IMyBeacon)Entity;
             cubeGrid = beaconBlock.CubeGrid;
+
             if (!MyAPIGateway.Session.IsServer && MyAPIGateway.Multiplayer.MultiplayerActive)
             {
                 NeedsUpdate = MyEntityUpdateEnum.EACH_10TH_FRAME;
@@ -62,10 +65,6 @@ namespace AutoBeacon
             NeedsUpdate = MyEntityUpdateEnum.EACH_100TH_FRAME | MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
 
             AddHandlers(beaconBlock, cubeGrid);
-
-            beaconBlock.Radius = syncAutoRangeRadius.Value;
-            beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, AutoBeaconSessionComponent.Instance?.Config);
-            beaconBlock.Enabled = true;
         }
 
         public override void Close()
@@ -85,6 +84,17 @@ namespace AutoBeacon
             sink.SetMaxRequiredInputByType(Electricity, 0);
             sink.SetRequiredInputFuncByType(Electricity, () => 0);
             sink.Update();
+
+            IgnoredBeacon = Util.IsNpcOwned(beaconBlock);
+
+            if (IgnoredBeacon)
+            {
+                return;
+            }
+
+            beaconBlock.Radius = syncAutoRangeRadius.Value;
+            beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, AutoBeaconSessionComponent.Instance?.Config);
+            beaconBlock.Enabled = true;
 
             StartScan();
         }
@@ -119,7 +129,7 @@ namespace AutoBeacon
 
         public override void UpdateBeforeSimulation100()
         {
-            if (!Util.IsValid(cubeGrid))
+            if (!Util.IsValid(cubeGrid) || IgnoredBeacon)
             {
                 return;
             }
@@ -472,6 +482,26 @@ namespace AutoBeacon
 
             beacon.EnabledChanged += BeaconOnEnabledChanged;
             beacon.OnClosing += BeaconOnClosing;
+            beacon.OwnershipChanged += BeaconOnOwnershipChanged;
+        }
+
+        private void BeaconOnOwnershipChanged(IMyTerminalBlock obj)
+        {
+            if (!Util.IsValid(obj) || Util.IsClient)
+            {
+                return;
+            }
+
+            IgnoredBeacon = Util.IsNpcOwned(obj);
+            if (IgnoredBeacon)
+            {
+                return;
+            }
+
+            beaconBlock.Radius = syncAutoRangeRadius.Value;
+            beaconBlock.HudText = CreateBeaconName(beaconBlock.CubeGrid, AutoBeaconSessionComponent.Instance?.Config);
+            beaconBlock.Enabled = true;
+            StartScan();
         }
 
         private void AddHandlers(IMyCubeGrid grid)
@@ -501,6 +531,7 @@ namespace AutoBeacon
 
             beacon.EnabledChanged -= BeaconOnEnabledChanged;
             beacon.OnMarkForClose -= BeaconOnClosing;
+            beacon.OwnershipChanged -= BeaconOnOwnershipChanged;
         }
 
         private void RemoveHandlers(IMyCubeGrid grid)

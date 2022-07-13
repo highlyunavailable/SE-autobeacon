@@ -4,6 +4,7 @@ using Sandbox.Definitions;
 using Sandbox.ModAPI;
 using Sandbox.ModAPI.Interfaces.Terminal;
 using VRage.Game.Components;
+using VRage.Utils;
 
 namespace AutoBeacon
 {
@@ -59,7 +60,7 @@ namespace AutoBeacon
         {
             var beaconBlock = block as IMyBeacon;
             var logic = beaconBlock?.GameLogic.GetAs<AutoBeaconEntityComponent>();
-            if (logic == null)
+            if (logic == null || logic.UiBound)
             {
                 return;
             }
@@ -81,7 +82,7 @@ namespace AutoBeacon
                     var func = control.Visible;
                     Func<IMyTerminalBlock, bool> newFunc = terminalBlock =>
                         func(terminalBlock) &&
-                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>() == null;
+                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
 
                     control.Visible = newFunc;
 
@@ -102,16 +103,18 @@ namespace AutoBeacon
                     var func = control.Enabled;
                     control.Enabled = terminalBlock =>
                         func(terminalBlock) &&
-                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>() == null;
+                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
                 }
             }
+
+            logic.UiBound = true;
         }
 
         private void HandleBeaconActions(IMyTerminalBlock block, List<IMyTerminalAction> actions)
         {
             var beaconBlock = block as IMyBeacon;
             var logic = beaconBlock?.GameLogic.GetAs<AutoBeaconEntityComponent>();
-            if (logic == null)
+            if (logic == null || logic.IgnoredBeacon)
             {
                 return;
             }
