@@ -28,9 +28,12 @@ namespace AutoBeacon
         private int nextScanTick;
         private float radius;
         private Task? scanTask;
-        private MySync<float, SyncDirection.FromServer> syncAutoRangeRadius; // Game takes care of init
+
+        // Expected that this is never initialized, the game takes care of it
+        private MySync<float, SyncDirection.FromServer> syncAutoRangeRadius;
         private bool updateBeacon;
         private float weatherModifier;
+        internal bool UiBound;
 
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
         public bool IgnoredBeacon { get; private set; }
