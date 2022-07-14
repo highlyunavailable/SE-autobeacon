@@ -33,7 +33,6 @@ namespace AutoBeacon
         private MySync<float, SyncDirection.FromServer> syncAutoRangeRadius;
         private bool updateBeacon;
         private float weatherModifier;
-        internal bool UiBound;
 
         private MyResourceSinkComponent ResourceSink => (MyResourceSinkComponent)beaconBlock.ResourceSink;
         public bool IgnoredBeacon { get; private set; }

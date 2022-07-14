@@ -20,6 +20,8 @@ namespace AutoBeacon
             "OnOff", "OnOff_On", "OnOff_Off", "IncreaseRadius", "DecreaseRadius"
         };
 
+        private bool initControls;
+
         public static AutoBeaconSessionComponent Instance { get; private set; }
         public BeaconConfiguration Config { get; private set; }
 
@@ -60,7 +62,12 @@ namespace AutoBeacon
         {
             var beaconBlock = block as IMyBeacon;
             var logic = beaconBlock?.GameLogic.GetAs<AutoBeaconEntityComponent>();
-            if (logic == null || logic.UiBound)
+            if (logic == null)
+            {
+                return;
+            }
+
+            if (initControls)
             {
                 return;
             }
@@ -81,8 +88,10 @@ namespace AutoBeacon
                 {
                     var func = control.Visible;
                     Func<IMyTerminalBlock, bool> newFunc = terminalBlock =>
-                        func(terminalBlock) &&
-                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
+                    {
+                        var component = terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>();
+                        return func(terminalBlock) && (component == null || component.IgnoredBeacon);
+                    };
 
                     control.Visible = newFunc;
 
@@ -102,12 +111,14 @@ namespace AutoBeacon
                 {
                     var func = control.Enabled;
                     control.Enabled = terminalBlock =>
-                        func(terminalBlock) &&
-                        terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>()?.IgnoredBeacon != false;
+                    {
+                        var component = terminalBlock.GameLogic.GetAs<AutoBeaconEntityComponent>();
+                        return func(terminalBlock) && (component == null || component.IgnoredBeacon);
+                    };
                 }
             }
 
-            logic.UiBound = true;
+            initControls = true;
         }
 
         private void HandleBeaconActions(IMyTerminalBlock block, List<IMyTerminalAction> actions)
