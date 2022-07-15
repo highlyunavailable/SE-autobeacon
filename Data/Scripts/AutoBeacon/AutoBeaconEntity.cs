@@ -113,6 +113,13 @@ namespace AutoBeacon
                 ResourceSink.Update();
             }
 
+            IgnoredBeacon = Util.IsNpcOwned(beaconBlock);
+            if (IgnoredBeacon)
+            {
+                MyGameLogic.ChangeUpdate(this, MyEntityUpdateEnum.NONE);
+                return;
+            }
+            
             if (syncAutoRangeRadius.Value > 0)
             {
                 beaconBlock.Radius = syncAutoRangeRadius.Value;
@@ -458,7 +465,7 @@ namespace AutoBeacon
 
         private void ClientOnRadiusChanged(MySync<float, SyncDirection.FromServer> obj)
         {
-            if (!Util.IsValid(beaconBlock))
+            if (!Util.IsValid(beaconBlock) || IgnoredBeacon)
             {
                 return;
             }
