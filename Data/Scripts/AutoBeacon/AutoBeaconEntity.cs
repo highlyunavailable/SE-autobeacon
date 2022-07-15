@@ -282,6 +282,12 @@ namespace AutoBeacon
                 return;
             }
 
+            IgnoredBeacon = Util.IsNpcOwned(beaconBlock);
+            if (IgnoredBeacon)
+            {
+                return;
+            }
+            
             var config = AutoBeaconSessionComponent.Instance?.Config;
             if (config == null)
             {
